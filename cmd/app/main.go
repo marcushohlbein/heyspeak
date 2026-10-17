@@ -59,7 +59,6 @@ func main() {
 	mygo.App.OnWindowAllClosed(func() {})
 
 	var settingsWin *settings.Window
-	var permissionsWin *permissions.Window
 
 	mygo.App.WhenReady(func() {
 		if mgr, ok := services.Overlay.(*overlay.Manager); ok {
@@ -71,10 +70,19 @@ func main() {
 				log.Printf("shortcut reload: %v", err)
 			}
 		})
+		settingsWin.SetShortcutPause(func(paused bool) {
+			if paused {
+				if err := coordinator.StopShortcut(); err != nil {
+					log.Printf("shortcut pause: %v", err)
+				}
+				return
+			}
+			if err := coordinator.StartShortcut(); err != nil {
+				log.Printf("shortcut resume: %v", err)
+			}
+		})
 
-		permissionsWin = permissions.New()
-
-		trayUI, err = tray.Install(coordinator, permissionsWin.Show, settingsWin.Show, mygo.App.Quit)
+		trayUI, err = tray.Install(coordinator, settingsWin.Show, mygo.App.Quit)
 		if err != nil {
 			log.Printf("tray: %v", err)
 			mygo.Dialog.Error("speek tray unavailable",
@@ -85,7 +93,7 @@ func main() {
 			settingsWin.Show()
 		}
 		if permissions.NeedsAttention() {
-			permissionsWin.Show()
+			settingsWin.ShowSection("permissions")
 		}
 
 		if err := coordinator.StartShortcut(); err != nil {

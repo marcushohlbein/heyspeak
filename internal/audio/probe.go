@@ -9,12 +9,14 @@ type ProbeResult struct {
 	Peak       int
 }
 
-// Probe records until ctx is cancelled and reports level, not the audio itself.
-func Probe(ctx context.Context, deviceID string) (ProbeResult, error) {
+// Probe records until ctx is cancelled and reports level, not the audio
+// itself. OnLevel, when not nil, receives the running peak of each captured
+// chunk, for a live level meter.
+func Probe(ctx context.Context, deviceID string, onLevel func(peak int)) (ProbeResult, error) {
 	samples, err := recordSession(ctx, SessionConfig{
 		DeviceID:   deviceID,
 		SampleRate: uint32(SampleRate),
-		MaxSeconds: 5,
+		OnLevel:    onLevel,
 	})
 	if err != nil {
 		return ProbeResult{}, err
