@@ -3,7 +3,9 @@ package overlay
 import (
 	"errors"
 	"log"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -12,6 +14,23 @@ import (
 )
 
 type sessionMode int
+
+// frameState is the volatile per-frame glow state threaded through Draw.
+// Keeping it in one struct means a new volatile State field syncs in and out
+// here instead of via a hand-maintained copy-back list that silently resets.
+type frameState struct {
+	voice         overlayglow.VoicePulse
+	lastFrame     time.Time
+	gradientPhase float64
+}
+
+func (f frameState) into(s *overlayglow.State) {
+	s.Voice, s.LastFrame, s.GradientPhase = f.voice, f.lastFrame, f.gradientPhase
+}
+
+func (f *frameState) from(s *overlayglow.State) {
+	f.voice, f.lastFrame, f.gradientPhase = s.Voice, s.LastFrame, s.GradientPhase
+}
 
 const (
 	modeHidden       sessionMode = 0
@@ -29,6 +48,7 @@ type Manager struct {
 	lockedBounds   mygo.Rectangle
 	mode           sessionMode
 	glow           overlayglow.State
+	frame          frameState
 	opacity        float64
 	opacityFrom    float64
 	opacityTarget  float64
@@ -39,6 +59,7 @@ type Manager struct {
 	showTranscribe bool
 	prepared       bool
 	displaysHooked bool
+	micPeak        atomic.Uint32
 }
 
 // NewManager creates an overlay manager. Call RegisterDisplayChanges after the app is ready.
@@ -86,6 +107,22 @@ func (m *Manager) PrepareSession() {
 	})
 }
 
+// OnMicPeak receives capture peaks from the audio thread (0..32767 PCM).
+// The recording view already requests frames, so this only stores the peak.
+func (m *Manager) OnMicPeak(peak int) {
+	level := overlayglow.PeakToPulseLevel(peak)
+	bits := math.Float32bits(level)
+	for {
+		old := m.micPeak.Load()
+		if level <= math.Float32frombits(old) {
+			return
+		}
+		if m.micPeak.CompareAndSwap(old, bits) {
+			return
+		}
+	}
+}
+
 // ShowRecording fades the recording glow in on the prepared display.
 func (m *Manager) ShowRecording() {
 	mygo.RunOnMain(func() {
@@ -98,11 +135,11 @@ func (m *Manager) ShowRecording() {
 		m.showTranscribe = false
 		m.glow.Visual = overlayglow.VisualRecording
 		m.glow.Start = time.Now()
+		m.frame = frameState{}
+		m.micPeak.Store(0)
 		m.glow.Visible = true
-		if m.opacity < 0.4 {
-			m.opacity = 0.4
-		}
-		m.opacityFrom = m.opacity
+		m.opacity = 0
+		m.opacityFrom = 0
 		m.opacityTarget = 1
 		m.animStart = time.Now()
 		m.animDuration = fadeInDuration
@@ -192,7 +229,8 @@ func (m *Manager) onDisplaysChanged() {
 func (m *Manager) view(c *ui.Context) {
 	now := time.Now()
 	m.mu.Lock()
-	m.opacity = advanceOpacity(now, m.animStart, m.opacityFrom, m.opacityTarget, m.animDuration)
+	fadeDur := fadeDuration(m.hiding, m.opacityTarget, m.opacityFrom, c.Preferences().ReduceMotion, m.animDuration)
+	m.opacity = advanceOpacity(now, m.animStart, m.opacityFrom, m.opacityTarget, fadeDur)
 	m.glow.Opacity = m.opacity
 
 	if m.mode == modeTranscribing && !m.showTranscribe && now.Sub(m.transcribeAt) >= TranscribeVisualDelay {
@@ -209,7 +247,11 @@ func (m *Manager) view(c *ui.Context) {
 	recording := mode == modeRecording || mode == modeTranscribing
 	showGlow := (recording && !hiding) || (hiding && m.opacity > 0.001)
 	m.glow.Visible = showGlow
+	if bits := m.micPeak.Swap(0); bits != 0 {
+		m.frame.voice.Push(math.Float32frombits(bits))
+	}
 	state := m.glow
+	m.frame.into(&state)
 	finishHide := hiding && m.opacity <= 0.001
 	m.mu.Unlock()
 
@@ -218,6 +260,7 @@ func (m *Manager) view(c *ui.Context) {
 	overlayglow.Draw(&state, c)
 	m.mu.Lock()
 	m.glow.GPU = state.GPU
+	m.frame.from(&state)
 	m.mu.Unlock()
 
 	// Draw only requests another frame once the glow is already visible.
@@ -235,6 +278,8 @@ func (m *Manager) finishHide() {
 	m.hiding = false
 	m.mode = modeHidden
 	m.glow.Visible = false
+	m.frame.voice.Reset()
+	m.micPeak.Store(0)
 	m.opacity = 0
 	m.prepared = false
 	m.mu.Unlock()
@@ -248,6 +293,8 @@ func (m *Manager) teardown() {
 	m.mode = modeHidden
 	m.hiding = false
 	m.glow.Visible = false
+	m.frame.voice.Reset()
+	m.micPeak.Store(0)
 	m.opacity = 0
 	m.showTranscribe = false
 	m.prepared = false

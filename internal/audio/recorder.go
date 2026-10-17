@@ -13,11 +13,20 @@ import (
 type Recorder struct {
 	store *config.Store
 
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	done   chan struct{}
-	out    []int16
-	err    error
+	mu      sync.Mutex
+	onLevel func(peak int)
+	cancel  context.CancelFunc
+	done    chan struct{}
+	out     []int16
+	err     error
+}
+
+// SetOnLevel registers a callback for live input peaks during capture.
+// The callback runs on the audio thread; keep work minimal.
+func (r *Recorder) SetOnLevel(fn func(peak int)) {
+	r.mu.Lock()
+	r.onLevel = fn
+	r.mu.Unlock()
 }
 
 // NewRecorder creates a capturer backed by configuration.
@@ -47,6 +56,14 @@ func (r *Recorder) Start(ctx context.Context) error {
 		DeviceID:   cfg.InputDeviceID,
 		MaxSeconds: cfg.MaxRecordingSeconds,
 		SampleRate: uint32(SampleRate),
+		OnLevel: func(peak int) {
+			r.mu.Lock()
+			fn := r.onLevel
+			r.mu.Unlock()
+			if fn != nil {
+				fn(peak)
+			}
+		},
 	}
 
 	go func() {

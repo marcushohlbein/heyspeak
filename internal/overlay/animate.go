@@ -6,11 +6,28 @@ import (
 )
 
 const (
-	fadeInDuration  = 280 * time.Millisecond
-	fadeOutDuration = 220 * time.Millisecond
+	fadeInDuration  = 420 * time.Millisecond
+	fadeOutDuration = 520 * time.Millisecond
+	fadeInReduced   = 120 * time.Millisecond
+	fadeOutReduced  = 150 * time.Millisecond
 	// TranscribeVisualDelay is how long processing may run before showing the subtle state.
 	TranscribeVisualDelay = 300 * time.Millisecond
 )
+
+// fadeDuration picks the fade length for the current animation, honoring
+// reduced motion with shorter fixed durations.
+func fadeDuration(hiding bool, target, from float64, reduceMotion bool, d time.Duration) time.Duration {
+	if !reduceMotion {
+		return d
+	}
+	if hiding {
+		return fadeOutReduced
+	}
+	if target > from {
+		return fadeInReduced
+	}
+	return d
+}
 
 // advanceOpacity moves current toward target over the given duration.
 func advanceOpacity(now, animStart time.Time, from, target float64, duration time.Duration) float64 {
