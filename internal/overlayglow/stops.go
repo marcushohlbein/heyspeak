@@ -6,17 +6,19 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// Siri / Apple Intelligence edge palette (sampled order: blue → violet → pink → coral → amber → lavender).
-// Fixed positions around the ring; motion comes from rotating the conic angle in view.go.
+// Siri / Apple Intelligence edge palette. The warm arc (pink → coral →
+// amber) is mirrored 180° so both sides of the screen run warm, with a
+// cool gap (violet, blue) between the arcs; motion comes from rotating
+// the conic angle in view.go.
 var siriRing = []ui.Color{
-	ui.Hex("#0894FF"),
-	ui.Hex("#8D9FFF"),
-	ui.Hex("#BC82F3"),
-	ui.Hex("#AA6EEE"),
 	ui.Hex("#F5B9EA"),
 	ui.Hex("#FF6778"),
 	ui.Hex("#FFBA71"),
-	ui.Hex("#C686FF"),
+	ui.Hex("#BC82F3"),
+	ui.Hex("#F5B9EA"),
+	ui.Hex("#FF6778"),
+	ui.Hex("#FFBA71"),
+	ui.Hex("#0894FF"),
 }
 
 // 8 palette colors × 3 samples − 1 seam-shared + 2 seam stops = 25 ≤ 32;
