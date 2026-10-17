@@ -84,7 +84,7 @@ func (s *Store) ListCatalog(ctx context.Context) ([]EntryStatus, error) {
 			out = append(out, st)
 			continue
 		}
-		if err := s.verifyCached(rec.Path, entry.SHA256); err != nil {
+		if err := s.verifyInstalledRecord(rec, entry.SHA256); err != nil {
 			out = append(out, st)
 			continue
 		}
@@ -254,12 +254,22 @@ func (s *Store) ModelPath(id string) (string, error) {
 	if !ok {
 		return "", ErrNotInstalled
 	}
-	abs, err := filepath.Abs(rec.Path)
-	if err != nil {
-		abs = rec.Path
-	}
-	if err := s.verifyCached(abs, entry.SHA256); err != nil {
+	if err := s.verifyInstalledRecord(rec, entry.SHA256); err != nil {
 		return "", err
 	}
 	return rec.Path, nil
+}
+
+func (s *Store) verifyInstalledRecord(rec installedRecord, catalogSHA string) error {
+	path := rec.Path
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+	if rec.SHA256 != "" {
+		if err := s.verifyCached(path, rec.SHA256); err == nil {
+			return nil
+		}
+	}
+	return s.verifyCached(path, catalogSHA)
 }

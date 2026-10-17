@@ -16,6 +16,9 @@ type SessionConfig struct {
 	DeviceID   string
 	MaxSeconds int
 	SampleRate uint32
+	// OnLevel, when not nil, receives each captured chunk's peak, from the
+	// capture thread.
+	OnLevel func(peak int)
 }
 
 // recordSession captures until ctx is cancelled or the sample cap is reached.
@@ -69,6 +72,14 @@ func recordSession(parent context.Context, cfg SessionConfig) ([]int16, error) {
 			return
 		}
 		frame := decodeCapture(inputBuffer, int(frameCount), openedChannels, opened)
+		if cfg.OnLevel != nil {
+			cfg.OnLevel(peakAbs(frame))
+			// A level callback with no sample cap is a live meter (settings
+			// mic test). It can run until cancelled, so the PCM is not kept.
+			if maxSamples == 0 {
+				return
+			}
+		}
 		mu.Lock()
 		var capped bool
 		samples, capped = appendBounded(samples, frame, maxSamples)

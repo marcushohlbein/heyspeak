@@ -40,7 +40,6 @@ func TestDownloadVerifyInstall(t *testing.T) {
 	entry := CatalogEntry{
 		ID:        "ggml-tiny",
 		Name:      "Test",
-		Engine:    EngineWhisperCpp,
 		URL:       srv.URL,
 		SizeBytes: int64(len(payload)),
 		SHA256:    digest,

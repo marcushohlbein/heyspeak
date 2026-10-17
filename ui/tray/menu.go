@@ -13,7 +13,7 @@ type UI struct {
 }
 
 // Install creates the background tray icon and menu.
-func Install(coord *app.Coordinator, onPermissions, onSettings func(), onQuit func()) (*UI, error) {
+func Install(coord *app.Coordinator, onSettings func(), onQuit func()) (*UI, error) {
 	ui := &UI{coord: coord}
 	tray, err := mygo.NewTray(mygo.TrayOptions{
 		Icon:           trayIcon(),
@@ -34,7 +34,6 @@ func Install(coord *app.Coordinator, onPermissions, onSettings func(), onQuit fu
 	}
 	tray.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
 		ui.cancel,
-		{Label: "Permissions…", Click: func(*mygo.MenuItem, *mygo.Window) { onPermissions() }},
 		{Label: "Settings…", Click: func(*mygo.MenuItem, *mygo.Window) { onSettings() }},
 		{Role: mygo.RoleQuit, Click: func(*mygo.MenuItem, *mygo.Window) { onQuit() }},
 	}))
