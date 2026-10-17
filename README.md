@@ -62,6 +62,12 @@ Produces `dist/Speek.app` with the built binary. You still need whisper.cpp buil
 
 See [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) and phase docs in [docs/](docs/). Third-party notices: [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md).
 
+## Releases
+
+Versioning is managed by [release-please](https://github.com/googleapis/release-please). Use [Conventional Commits](https://www.conventionalcommits.org/) on `main` (`feat:`, `fix:`, etc.); the workflow opens or updates a release PR with changelog and version bumps. Merge that PR to tag a GitHub release.
+
+Current version is tracked in `internal/version/version.go` and `scripts/macos/Info.plist`.
+
 ## Spikes
 
 - `go run ./cmd/spike-capture-paste` — mic + clipboard + paste chord  
