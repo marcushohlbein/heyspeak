@@ -1,0 +1,35 @@
+name: Release build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build and package
+        run: make package
+
+      - name: Archive app bundle
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          arch="$(uname -m)"
+          zip -r "dist/Speek-${RELEASE_TAG}-darwin-${arch}.zip" dist/Speek.app
+
+      - name: Upload to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/*.zip --clobber
