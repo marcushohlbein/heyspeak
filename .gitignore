@@ -1,0 +1,5 @@
+/bin/
+dist/
+/spike-capture-paste
+*.exe
+third_party/whisper.cpp/
