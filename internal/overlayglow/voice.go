@@ -75,7 +75,15 @@ type VoiceBreath struct {
 // VoiceBreath returns multipliers for a Siri-like inhale/exhale tied to voice level.
 func BreathForVoice(now float64, voice float64, reduceMotion bool) VoiceBreath {
 	if voice <= 0.02 {
-		return VoiceBreath{1, 1, 1}
+		if reduceMotion {
+			return VoiceBreath{1, 1, 1}
+		}
+		// Idle breath: width only, ±2.5% at 0.2Hz — alive, not flickering.
+		return VoiceBreath{
+			OpacityMult: 1,
+			WidthMult:   float32(1 + 0.025*math.Sin(now*1.2566)),
+			BlurMult:    1,
+		}
 	}
 	beat := 1.0
 	if !reduceMotion {
@@ -87,8 +95,8 @@ func BreathForVoice(now float64, voice float64, reduceMotion bool) VoiceBreath {
 		// Dim-breathe: brighten-only clamps at full overlay opacity, so the
 		// pulse was invisible in the steady recording state. Dip instead.
 		OpacityMult: 1 - wave*0.30*(1-beat),
-		WidthMult:   float32(1 + wave*0.42),
-		BlurMult:    float32(1 + wave*0.65),
+		WidthMult:   float32(1 + wave*0.22),
+		BlurMult:    float32(1 + wave*0.38),
 	}
 }
 
