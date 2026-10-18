@@ -95,8 +95,8 @@ func BreathForVoice(now float64, voice float64, reduceMotion bool) VoiceBreath {
 		// Dim-breathe: brighten-only clamps at full overlay opacity, so the
 		// pulse was invisible in the steady recording state. Dip instead.
 		OpacityMult: 1 - wave*0.30*(1-beat),
-		WidthMult:   float32(1 + wave*0.22),
-		BlurMult:    float32(1 + wave*0.38),
+		WidthMult:   float32(1 + wave*0.10),
+		BlurMult:    float32(1 + wave*0.18),
 	}
 }
 
