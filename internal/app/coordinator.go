@@ -285,6 +285,7 @@ func (c *Coordinator) transcribeAndPaste(gen uint64, samples []int16) {
 			return
 		}
 		if errors.Is(err, transcription.ErrNoSpeech) || errors.Is(err, transcription.ErrEmptyAudio) {
+			c.svc.Overlay.DoublePulse()
 			c.userFailure(gen, "No speech detected.", "", false)
 			return
 		}
@@ -296,6 +297,7 @@ func (c *Coordinator) transcribeAndPaste(gen uint64, samples []int16) {
 		return
 	}
 	if strings.TrimSpace(text) == "" {
+		c.svc.Overlay.DoublePulse()
 		c.userFailure(gen, "No speech detected.", "", false)
 		return
 	}
@@ -321,6 +323,7 @@ func (c *Coordinator) transcribeAndPaste(gen uint64, samples []int16) {
 	c.mu.Lock()
 	c.trayTooltip = ""
 	c.mu.Unlock()
+	c.svc.Overlay.Pulse(0.9)
 	c.returnIdle(gen)
 }
 

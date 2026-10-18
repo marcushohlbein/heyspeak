@@ -7,18 +7,17 @@ import (
 
 func TestAdvanceOpacityReachesTarget(t *testing.T) {
 	start := time.Now()
-	got := advanceOpacity(start.Add(fadeInDuration), start, 0, 1, fadeInDuration)
+	got := advanceOpacity(start.Add(fadeInDuration), start, 0, 1, fadeInDuration, easeOutShow)
 	if got < 0.99 {
 		t.Fatalf("expected ~1, got %v", got)
 	}
 }
 
-func TestAdvanceOpacityMidpoint(t *testing.T) {
+func TestAdvanceOpacityFastStart(t *testing.T) {
 	start := time.Now()
-	mid := start.Add(fadeInDuration / 2)
-	got := advanceOpacity(mid, start, 0, 1, fadeInDuration)
-	if got <= 0.1 || got >= 0.9 {
-		t.Fatalf("expected mid-range opacity, got %v", got)
+	got := advanceOpacity(start.Add(fadeInDuration/4), start, 0, 1, fadeInDuration, easeOutShow)
+	if got < 0.7 {
+		t.Fatalf("expected fast entrance (~0.77 at 25%%), got %v", got)
 	}
 }
 
