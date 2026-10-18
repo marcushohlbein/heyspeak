@@ -22,7 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+          # workflow_dispatch backfills use main; release-please tags match main at ship time.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.event.release.tag_name }}
 
       - uses: actions/setup-go@v5
         with:

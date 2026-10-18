@@ -1,5 +1,9 @@
 WHISPER_DIR := third_party/whisper.cpp
 WHISPER_BUILD := $(WHISPER_DIR)/build
+WHISPER_ROOT := $(abspath $(WHISPER_DIR))
+WHISPER_BUILD_ABS := $(abspath $(WHISPER_BUILD))
+WHISPER_CGO_CFLAGS := -I$(WHISPER_ROOT)/include -I$(WHISPER_ROOT)/ggml/include
+WHISPER_CGO_LDFLAGS := -L$(WHISPER_BUILD_ABS)/src -L$(WHISPER_BUILD_ABS)/ggml/src -lwhisper -lggml -lggml-base -lggml-cpu -lm -lstdc++ -L$(WHISPER_BUILD_ABS)/ggml/src/ggml-metal -L$(WHISPER_BUILD_ABS)/ggml/src/ggml-blas -lggml-metal -lggml-blas -framework Accelerate -framework Metal -framework Foundation -framework CoreGraphics
 
 .PHONY: whisper speek test package
 
@@ -12,10 +16,12 @@ whisper:
 	cmake --build $(WHISPER_BUILD) --target whisper -j
 
 speek: whisper
-	CGO_ENABLED=1 go build -o bin/speek ./cmd/app
+	CGO_ENABLED=1 CGO_CFLAGS="$(WHISPER_CGO_CFLAGS)" CGO_LDFLAGS="$(WHISPER_CGO_LDFLAGS)" \
+		go build -o bin/speek ./cmd/app
 
-test:
-	CGO_ENABLED=1 go test ./...
+test: whisper
+	CGO_ENABLED=1 CGO_CFLAGS="$(WHISPER_CGO_CFLAGS)" CGO_LDFLAGS="$(WHISPER_CGO_LDFLAGS)" \
+		go test ./...
 
 package: speek
 	rm -rf $(APP_DIR)

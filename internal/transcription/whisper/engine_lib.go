@@ -64,7 +64,6 @@ func (e *Engine) Transcribe(ctx context.Context, samples []int16, modelID string
 		}
 	}
 	wctx.SetTokenTimestamps(false)
-	wctx.SetNoTimestamps(true)
 
 	peak := peakAbsPCM(samples)
 	boosted := boostQuietPCM(samples, peak)
