@@ -24,10 +24,13 @@ type Services struct {
 // DefaultServices wires production implementations for the desktop shell.
 func DefaultServices(store *config.Store) Services {
 	modelsMgr := models.NewStore(store)
+	overlayMgr := overlay.NewManager()
+	rec := audio.NewRecorder(store)
+	rec.SetOnLevel(overlayMgr.OnMicPeak)
 	return Services{
 		Shortcut:      shortcut.NewHoldMonitor(),
-		Overlay:       overlay.NewManager(),
-		Audio:         audio.NewRecorder(store),
+		Overlay:       overlayMgr,
+		Audio:         rec,
 		Transcription: whisper.NewEngine(modelsMgr, store),
 		Paste:         paste.Default(store),
 		Models:        modelsMgr,

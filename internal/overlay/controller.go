@@ -6,6 +6,8 @@ type Controller interface {
 	PrepareSession()
 	ShowRecording()
 	ShowTranscribing()
+	Pulse(strength float32)
+	DoublePulse()
 	Hide()
 	Close()
 }

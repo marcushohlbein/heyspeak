@@ -8,6 +8,10 @@ type FakeController struct {
 
 func (f *FakeController) PrepareSession() {}
 
+func (f *FakeController) Pulse(strength float32) {}
+
+func (f *FakeController) DoublePulse() {}
+
 func (f *FakeController) ShowRecording() {
 	f.Visible = true
 	f.Transcribing = false

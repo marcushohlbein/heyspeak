@@ -2,84 +2,72 @@ package overlayglow
 
 import (
 	"math"
-	"math/rand/v2"
-	"slices"
 
 	"github.com/egoist/mygo/ui"
 )
 
-var glowColors = []ui.Color{
-	ui.Hex("#BC82F3"), ui.Hex("#F5B9EA"), ui.Hex("#8D9FFF"),
-	ui.Hex("#FF6778"), ui.Hex("#FFBA71"), ui.Hex("#C686FF"),
+var siriRing = []ui.Color{
+	ui.Hex("#F5B9EA"),
+	ui.Hex("#FF6778"),
+	ui.Hex("#FFBA71"),
+	ui.Hex("#BC82F3"),
+	ui.Hex("#F5B9EA"),
+	ui.Hex("#FF6778"),
+	ui.Hex("#FFBA71"),
+	ui.Hex("#0894FF"),
 }
 
-const shuffleEvery, shuffleTime = 0.5, 1.0
+const siriBlendSteps = 3 // stay within mygo scene.MaxStops (32)
 
 type stop struct {
 	l, a, b, at float64
 }
 
-// Stops animates conic gradient colors around the display edge (from MyGo chat-glow).
-type Stops struct {
-	from, to    []stop
-	since, next float64
-}
+type Stops struct{}
 
-func NewStops() Stops {
-	s := Stops{}
-	s.to = s.shuffle()
-	s.from = s.to
-	return s
-}
+func NewStops() Stops { return Stops{} }
 
-func (s *Stops) shuffle() []stop {
-	out := make([]stop, len(glowColors))
-	for i, c := range glowColors {
-		l, a, b := oklab(c)
-		out[i] = stop{l, a, b, rand.Float64()}
+var ringStops = siriGradientStops()
+
+func (s *Stops) Gradient(float64) []ui.GradientStop { return ringStops }
+
+func siriGradientStops() []ui.GradientStop {
+	st := siriRingStops(siriBlendSteps)
+	if len(st) == 0 {
+		return nil
 	}
-	slices.SortFunc(out, func(a, b stop) int {
-		if a.at < b.at {
-			return -1
-		}
-		if a.at > b.at {
-			return 1
-		}
-		return 0
-	})
-	return out
-}
-
-func (s *Stops) step(now float64) {
-	if now < s.next {
-		return
-	}
-	s.from = s.show(now)
-	s.to, s.since, s.next = s.shuffle(), now, now+shuffleEvery
-}
-
-func (s *Stops) show(now float64) []stop {
-	k := ease(min(max((now-s.since)/shuffleTime, 0), 1))
-	out := make([]stop, len(s.to))
-	for i := range out {
-		f, t := s.from[i], s.to[i]
-		out[i] = stop{f.l + (t.l-f.l)*k, f.a + (t.a-f.a)*k, f.b + (t.b-f.b)*k, f.at + (t.at-f.at)*k}
-	}
-	return out
-}
-
-func (s *Stops) Gradient(now float64) []ui.GradientStop {
-	s.step(now)
-	st := s.show(now)
 	first, last := st[0], st[len(st)-1]
 	k := (1 - last.at) / max(first.at+1-last.at, 1e-6)
-	seam := srgb(last.l+(first.l-last.l)*k, last.a+(first.a-last.a)*k, last.b+(first.b-last.b)*k)
+	seam := srgb(
+		last.l+(first.l-last.l)*k,
+		last.a+(first.a-last.a)*k,
+		last.b+(first.b-last.b)*k,
+	)
 	out := make([]ui.GradientStop, 0, len(st)+2)
 	out = append(out, ui.GradientStop{Color: seam, At: 0})
 	for _, x := range st {
 		out = append(out, ui.GradientStop{Color: srgb(x.l, x.a, x.b), At: float32(x.at)})
 	}
 	return append(out, ui.GradientStop{Color: seam, At: 1})
+}
+
+func siriRingStops(stepsPerSegment int) []stop {
+	n := len(siriRing)
+	out := make([]stop, 0, n*stepsPerSegment)
+	for i := 0; i < n; i++ {
+		l0, a0, b0 := oklab(siriRing[i])
+		l1, a1, b1 := oklab(siriRing[(i+1)%n])
+		for j := 0; j < stepsPerSegment; j++ {
+			t := float64(j) / float64(stepsPerSegment)
+			out = append(out, stop{
+				l:  l0 + (l1-l0)*t,
+				a:  a0 + (a1-a0)*t,
+				b:  b0 + (b1-b0)*t,
+				at: (float64(i) + t) / float64(n),
+			})
+		}
+	}
+	return out
 }
 
 func srgb(l, a, b float64) ui.Color {
@@ -116,11 +104,4 @@ func oklab(c ui.Color) (l, a, b float64) {
 	return 0.2104542553*lc + 0.7936177850*mc - 0.0040720468*sc,
 		1.9779984951*lc - 2.4285922050*mc + 0.4505937099*sc,
 		0.0259040371*lc + 0.7827717662*mc - 0.8086757660*sc
-}
-
-func ease(t float64) float64 {
-	if t < 0.5 {
-		return 4 * t * t * t
-	}
-	return 1 - math.Pow(-2*t+2, 3)/2
 }
