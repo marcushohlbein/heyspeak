@@ -18,7 +18,6 @@ type State struct {
 	Visible       bool
 	Opacity       float64 // 0..1 animated envelope
 	TranscribeDim float64 // 1 full brightness, eased toward 0.45 while transcribing
-	Visual        Visual
 	Stops         Stops
 	Voice         VoicePulse
 	GPU           bool
@@ -41,6 +40,9 @@ func Draw(s *State, c *ui.Context) {
 	dt := 0.0
 	if !s.LastFrame.IsZero() {
 		dt = frameNow.Sub(s.LastFrame).Seconds()
+		if dt > 0.1 {
+			dt = 0.1
+		}
 	}
 	s.LastFrame = frameNow
 

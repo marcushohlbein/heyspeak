@@ -1,11 +1,31 @@
 package overlayglow
 
-import "math"
+import (
+	"math"
+	"time"
+)
+
+type queuedPulse struct {
+	level float32
+	wait  float64
+}
 
 // VoicePulse smooths microphone peaks into a 0..1 envelope for Siri-like edge pulsing.
 type VoicePulse struct {
 	smooth float64
 	target float64
+	queue  []queuedPulse
+}
+
+// Queue schedules a pulse level after a delay; drained on Advance from the frame clock.
+func (v *VoicePulse) Queue(level float32, after time.Duration) {
+	if level < 0 {
+		level = 0
+	}
+	if level > 1 {
+		level = 1
+	}
+	v.queue = append(v.queue, queuedPulse{level, after.Seconds()})
 }
 
 // Push records the loudest sample seen for the current frame (0..1).
@@ -24,6 +44,18 @@ func (v *VoicePulse) Push(level float32) {
 
 // Advance moves the envelope toward the frame peak; call once per rendered frame.
 func (v *VoicePulse) Advance(dt float64) {
+	if dt > 0.1 {
+		dt = 0.1
+	}
+	if dt > 0 {
+		for i := range v.queue {
+			v.queue[i].wait -= dt
+		}
+		for len(v.queue) > 0 && v.queue[0].wait <= 0 {
+			v.Push(v.queue[0].level)
+			v.queue = v.queue[1:]
+		}
+	}
 	if dt <= 0 {
 		return
 	}
@@ -50,6 +82,7 @@ func (v *VoicePulse) Level() float64 {
 func (v *VoicePulse) Reset() {
 	v.smooth = 0
 	v.target = 0
+	v.queue = nil
 }
 
 // PeakToPulseLevel maps capture peaks to a 0..1 pulse. Divisor 1600 makes

@@ -3,7 +3,32 @@ package overlayglow
 import (
 	"math"
 	"testing"
+	"time"
 )
+
+func TestVoicePulseQueueDeliversOnFrameClock(t *testing.T) {
+	v := VoicePulse{}
+	v.Queue(0.45, 0)
+	v.Queue(0.45, 100*time.Millisecond)
+	v.Advance(0)
+	if v.Level() > 0.01 {
+		t.Fatalf("first pulse should not advance envelope without dt")
+	}
+	v.Advance(1 / 60.0)
+	if v.Level() < 0.1 {
+		t.Fatalf("expected first queued pulse, got %v", v.Level())
+	}
+	for i := 0; i < 8; i++ {
+		v.Advance(1 / 60.0)
+	}
+	if v.Level() < 0.12 {
+		t.Fatalf("expected second queued pulse, got %v", v.Level())
+	}
+	v.Reset()
+	if len(v.queue) != 0 {
+		t.Fatalf("reset should clear queued pulses")
+	}
+}
 
 func TestVoicePulseRespondsAndDecays(t *testing.T) {
 	v := VoicePulse{}

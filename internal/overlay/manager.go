@@ -15,28 +15,13 @@ import (
 
 type sessionMode int
 
-// frameState is the volatile per-frame glow state threaded through Draw.
-// Keeping it in one struct means a new volatile State field syncs in and out
-// here instead of via a hand-maintained copy-back list that silently resets.
-type frameState struct {
-	voice         overlayglow.VoicePulse
-	lastFrame     time.Time
-	gradientPhase float64
-}
-
-func (f frameState) into(s *overlayglow.State) {
-	s.Voice, s.LastFrame, s.GradientPhase = f.voice, f.lastFrame, f.gradientPhase
-}
-
-func (f *frameState) from(s *overlayglow.State) {
-	f.voice, f.lastFrame, f.gradientPhase = s.Voice, s.LastFrame, s.GradientPhase
-}
-
 const (
 	modeHidden       sessionMode = 0
 	modeRecording    sessionMode = 1
 	modeTranscribing sessionMode = 2
 )
+
+const doublePulseGap = 100 * time.Millisecond
 
 // Manager owns the glow window, animations, and locked display geometry.
 type Manager struct {
@@ -48,7 +33,6 @@ type Manager struct {
 	lockedBounds   mygo.Rectangle
 	mode           sessionMode
 	glow           overlayglow.State
-	frame          frameState
 	opacity        float64
 	opacityFrom    float64
 	opacityTarget  float64
@@ -71,7 +55,6 @@ func NewManager() *Manager {
 		glow: overlayglow.State{
 			Stops:         overlayglow.NewStops(),
 			Start:         time.Now(),
-			Visual:        overlayglow.VisualRecording,
 			TranscribeDim: 1,
 			GPU:           true,
 		},
@@ -112,7 +95,6 @@ func (m *Manager) PrepareSession() {
 }
 
 // OnMicPeak receives capture peaks from the audio thread (0..32767 PCM).
-// The recording view already requests frames, so this only stores the peak.
 func (m *Manager) OnMicPeak(peak int) {
 	level := overlayglow.PeakToPulseLevel(peak)
 	bits := math.Float32bits(level)
@@ -127,23 +109,24 @@ func (m *Manager) OnMicPeak(peak int) {
 	}
 }
 
-// Pulse flares the glow once (0..1 level, not PCM peak — decoupled from
-// PeakToPulseLevel so pulse strengths stay put if sensitivity changes).
-// Safe from any goroutine; the envelope does the rest. A stale stored
-// level is harmless: ShowRecording zeroes it.
+// Pulse flares the glow once (0..1 level). Safe from any goroutine.
 func (m *Manager) Pulse(strength float32) {
-	if strength > 1 {
-		strength = 1
-	}
-	m.micPeak.Store(math.Float32bits(strength))
+	mygo.RunOnMain(func() {
+		m.mu.Lock()
+		m.glow.Voice.Queue(strength, 0)
+		m.mu.Unlock()
+		m.requestFrame()
+	})
 }
 
-// DoublePulse signals a failed take: two soft blips, distinct from the
-// single success flare.
+// DoublePulse signals a failed take: two soft blips on the frame clock.
 func (m *Manager) DoublePulse() {
-	m.Pulse(0.45)
-	time.AfterFunc(180*time.Millisecond, func() {
-		m.Pulse(0.45)
+	mygo.RunOnMain(func() {
+		m.mu.Lock()
+		m.glow.Voice.Queue(0.45, 0)
+		m.glow.Voice.Queue(0.45, doublePulseGap)
+		m.mu.Unlock()
+		m.requestFrame()
 	})
 }
 
@@ -157,15 +140,18 @@ func (m *Manager) ShowRecording() {
 		m.mode = modeRecording
 		m.hiding = false
 		m.showTranscribe = false
-		m.glow.Visual = overlayglow.VisualRecording
 		m.glow.Start = time.Now()
-		m.frame = frameState{}
+		m.glow.Voice.Reset()
 		m.micPeak.Store(0)
 		m.glow.TranscribeDim = 1
 		m.dimFrom, m.dimStart, m.dimTarget = 1, time.Time{}, 1
 		m.glow.Visible = true
-		m.opacity = 0
-		m.opacityFrom = 0
+		if m.opacity <= 0.001 {
+			m.opacity = 0
+			m.opacityFrom = 0
+		} else {
+			m.opacityFrom = m.opacity
+		}
 		m.opacityTarget = 1
 		m.animStart = time.Now()
 		m.animDuration = fadeInDuration
@@ -186,7 +172,6 @@ func (m *Manager) ShowTranscribing() {
 		m.mode = modeTranscribing
 		m.transcribeAt = time.Now()
 		m.showTranscribe = false
-		m.glow.Visual = overlayglow.VisualRecording
 		m.hiding = false
 		m.glow.Visible = true
 		m.mu.Unlock()
@@ -215,9 +200,7 @@ func (m *Manager) Hide() {
 		m.animStart = time.Now()
 		m.animDuration = fadeOutDuration
 		m.mu.Unlock()
-		if m.win != nil {
-			m.win.Update(func() {})
-		}
+		m.requestFrame()
 	})
 }
 
@@ -265,9 +248,7 @@ func (m *Manager) view(c *ui.Context) {
 
 	if m.mode == modeTranscribing && !m.showTranscribe && now.Sub(m.transcribeAt) >= TranscribeVisualDelay {
 		m.showTranscribe = true
-		m.glow.Visual = overlayglow.VisualTranscribing
 	}
-	// Ease the transcribe dim instead of stepping it (plan 002).
 	if m.showTranscribe {
 		if m.dimTarget != 0.45 {
 			m.dimFrom = m.glow.TranscribeDim
@@ -283,29 +264,24 @@ func (m *Manager) view(c *ui.Context) {
 
 	mode := m.mode
 	hiding := m.hiding
-	// Keep the glow marked visible through the fade-in. Gating on the current
-	// opacity made the first frame invisible, and that frame never asked for
-	// another, so the recording glow never appeared.
 	recording := mode == modeRecording || mode == modeTranscribing
 	showGlow := (recording && !hiding) || (hiding && m.opacity > 0.001)
 	m.glow.Visible = showGlow
 	if bits := m.micPeak.Swap(0); bits != 0 {
-		m.frame.voice.Push(math.Float32frombits(bits))
+		m.glow.Voice.Push(math.Float32frombits(bits))
 	}
 	state := m.glow
-	m.frame.into(&state)
 	finishHide := hiding && m.opacity <= 0.001
 	m.mu.Unlock()
 
-	// GPU is learned during paint. Keep it on the manager; a copied flag
-	// was discarded every frame, so the glow never drew.
 	overlayglow.Draw(&state, c)
 	m.mu.Lock()
 	m.glow.GPU = state.GPU
-	m.frame.from(&state)
+	m.glow.Voice = state.Voice
+	m.glow.LastFrame = state.LastFrame
+	m.glow.GradientPhase = state.GradientPhase
 	m.mu.Unlock()
 
-	// Draw only requests another frame once the glow is already visible.
 	if (recording || hiding) && !finishHide {
 		c.AnimationFrame()
 	}
@@ -320,7 +296,7 @@ func (m *Manager) finishHide() {
 	m.hiding = false
 	m.mode = modeHidden
 	m.glow.Visible = false
-	m.frame.voice.Reset()
+	m.glow.Voice.Reset()
 	m.micPeak.Store(0)
 	m.glow.TranscribeDim = 1
 	m.dimFrom, m.dimStart, m.dimTarget = 1, time.Time{}, 1
@@ -337,7 +313,7 @@ func (m *Manager) teardown() {
 	m.mode = modeHidden
 	m.hiding = false
 	m.glow.Visible = false
-	m.frame.voice.Reset()
+	m.glow.Voice.Reset()
 	m.micPeak.Store(0)
 	m.glow.TranscribeDim = 1
 	m.dimFrom, m.dimStart, m.dimTarget = 1, time.Time{}, 1
@@ -350,6 +326,12 @@ func (m *Manager) teardown() {
 	if win != nil {
 		win.Hide()
 		win.Close()
+	}
+}
+
+func (m *Manager) requestFrame() {
+	if m.win != nil {
+		m.win.Update(func() {})
 	}
 }
 
