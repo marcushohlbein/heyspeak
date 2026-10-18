@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/marcushohlbein/heyspeak/compare/v0.1.1...v0.1.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* configure Whisper linking for Go builds ([1acebf1](https://github.com/marcushohlbein/heyspeak/commit/1acebf1a898646e4cfd4d2e3f7f3707c8ed8647e))
+* trigger macOS builds for release-please releases ([ea5a26a](https://github.com/marcushohlbein/heyspeak/commit/ea5a26a7d33bb0a7c9e415d8a2300fb4154c2b99))
+
 ## [0.1.1](https://github.com/marcushohlbein/heyspeak/compare/v0.1.0...v0.1.1) (2026-10-18)
 
 
