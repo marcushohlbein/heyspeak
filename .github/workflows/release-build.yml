@@ -1,8 +1,17 @@
 name: Release build
 
+# `release: published` only fires when the release is created with a PAT (or
+# manually). release-please uses GITHUB_TOKEN, so release-please dispatches
+# this workflow after shipping a version. workflow_dispatch supports re-runs.
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (e.g. v0.1.1)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +21,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.event.inputs.tag }}
 
       - uses: actions/setup-go@v5
         with:
@@ -23,7 +34,7 @@ jobs:
 
       - name: Archive app bundle
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: |
           arch="$(uname -m)"
           zip -r "dist/Speek-${RELEASE_TAG}-darwin-${arch}.zip" dist/Speek.app
@@ -31,5 +42,5 @@ jobs:
       - name: Upload to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: gh release upload "$RELEASE_TAG" dist/*.zip --clobber
