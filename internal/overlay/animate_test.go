@@ -17,7 +17,7 @@ func TestAdvanceOpacityFastStart(t *testing.T) {
 	start := time.Now()
 	got := advanceOpacity(start.Add(fadeInDuration/4), start, 0, 1, fadeInDuration, easeOutShow)
 	if got < 0.7 {
-		t.Fatalf("expected fast entrance (~0.77 at 25%%), got %v", got)
+		t.Fatalf("expected fast entrance, got %v", got)
 	}
 }
 

@@ -25,7 +25,6 @@ func TestOnMicPeakKeepsLoudest(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	// Max value 3300 >= 3200, so the sqrt-clamped level is PeakToPulseLevel(3300) == 1.
 	if got := math.Float32frombits(m.micPeak.Load()); got != 1 {
 		t.Fatalf("expected loudest peak kept, got %v", got)
 	}

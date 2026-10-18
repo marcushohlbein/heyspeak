@@ -94,7 +94,6 @@ func (m *Manager) PrepareSession() {
 	})
 }
 
-// OnMicPeak receives capture peaks from the audio thread (0..32767 PCM).
 func (m *Manager) OnMicPeak(peak int) {
 	level := overlayglow.PeakToPulseLevel(peak)
 	bits := math.Float32bits(level)
@@ -109,7 +108,6 @@ func (m *Manager) OnMicPeak(peak int) {
 	}
 }
 
-// Pulse flares the glow once (0..1 level). Safe from any goroutine.
 func (m *Manager) Pulse(strength float32) {
 	mygo.RunOnMain(func() {
 		m.mu.Lock()
@@ -119,7 +117,6 @@ func (m *Manager) Pulse(strength float32) {
 	})
 }
 
-// DoublePulse signals a failed take: two soft blips on the frame clock.
 func (m *Manager) DoublePulse() {
 	mygo.RunOnMain(func() {
 		m.mu.Lock()

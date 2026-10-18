@@ -6,10 +6,6 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// Siri / Apple Intelligence edge palette. The warm arc (pink → coral →
-// amber) is mirrored 180° so both sides of the screen run warm, with a
-// cool gap (violet, blue) between the arcs; motion comes from rotating
-// the conic angle in view.go.
 var siriRing = []ui.Color{
 	ui.Hex("#F5B9EA"),
 	ui.Hex("#FF6778"),
@@ -21,16 +17,12 @@ var siriRing = []ui.Color{
 	ui.Hex("#0894FF"),
 }
 
-// 8 palette colors × 3 samples − 1 seam-shared + 2 seam stops = 25 ≤ 32;
-// mygo's painter caps gradients at scene.MaxStops = 32 and silently drops
-// the rest (ui/paint.go stops()), which would cut the closing seam stop.
-const siriBlendSteps = 3 // Oklab samples between each palette color
+const siriBlendSteps = 3 // stay within mygo scene.MaxStops (32)
 
 type stop struct {
 	l, a, b, at float64
 }
 
-// Stops is the fixed ring. Rotation is a separate phase so stop positions never jump.
 type Stops struct{}
 
 func NewStops() Stops { return Stops{} }

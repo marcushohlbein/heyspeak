@@ -9,15 +9,13 @@ import (
 
 var glowLayers = []struct{ width, blur float32 }{{5, 0}, {7, 3}, {8, 9}, {11, 11}}
 
-// gradientDegPerSec is ~18s per full turn. Integrated per frame: multiplying
-// elapsed time by a voice-dependent speed made the ring jump.
 const gradientDegPerSec = 20.0
 
 // State drives the edge overlay view.
 type State struct {
 	Visible       bool
 	Opacity       float64 // 0..1 animated envelope
-	TranscribeDim float64 // 1 full brightness, eased toward 0.45 while transcribing
+	TranscribeDim float64
 	Stops         Stops
 	Voice         VoicePulse
 	GPU           bool
@@ -81,7 +79,6 @@ func Draw(s *State, c *ui.Context) {
 
 func stepGradient(phase *float64, dt float64, reduceMotion bool) float32 {
 	if reduceMotion {
-		// Freeze in place: snapping to a canonical angle teleports the ring.
 		return float32(90 + *phase)
 	}
 	if dt > 0 {

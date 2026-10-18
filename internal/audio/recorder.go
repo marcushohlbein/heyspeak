@@ -21,8 +21,6 @@ type Recorder struct {
 	err     error
 }
 
-// SetOnLevel registers a callback for live input peaks during capture.
-// The callback runs on the audio thread; keep work minimal.
 func (r *Recorder) SetOnLevel(fn func(peak int)) {
 	r.mu.Lock()
 	r.onLevel = fn

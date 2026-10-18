@@ -15,8 +15,6 @@ const (
 	transcribeDimDuration = 200 * time.Millisecond
 )
 
-// fadeDuration picks the fade length for the current animation, honoring
-// reduced motion with shorter fixed durations.
 func fadeDuration(hiding bool, target, from float64, reduceMotion bool, d time.Duration) time.Duration {
 	if !reduceMotion {
 		return d
@@ -51,6 +49,4 @@ func easeInOut(t float64) float64 {
 	return 1 - math.Pow(-2*t+2, 3)/2
 }
 
-// easeOutShow is the strong UI ease-out — the analytic stand-in for
-// cubic-bezier(0.23, 1, 0.32, 1), matching it within ±0.01 across 0..1.
 func easeOutShow(t float64) float64 { return 1 - (1-t)*(1-t)*(1-t)*(1-t)*(1-t) }
