@@ -88,8 +88,23 @@ func TestBreathForVoiceReduceMotionIsTimeInvariant(t *testing.T) {
 	if a.OpacityMult == BreathForVoice(0, 0.6, false).OpacityMult {
 		t.Fatalf("expected motion-driven ripple, got %v", a.OpacityMult)
 	}
-	if got := BreathForVoice(5, 0.02, false); got != (VoiceBreath{1, 1, 1}) {
-		t.Fatalf("expected idle passthrough at or below 0.02, got %v", got)
+	if got := BreathForVoice(5, 0.02, true); got != (VoiceBreath{1, 1, 1}) {
+		t.Fatalf("reduce motion must fully freeze idle, got %v", got)
+	}
+}
+
+func TestBreathForVoiceIdleBreath(t *testing.T) {
+	if BreathForVoice(0, 0.01, false) == BreathForVoice(1000, 0.01, false) {
+		t.Fatalf("idle breath should vary over time without Reduce Motion")
+	}
+	for _, now := range []float64{0, 1.25, 3.7, 9.9} {
+		got := BreathForVoice(now, 0.01, false)
+		if got.OpacityMult != 1 || got.BlurMult != 1 {
+			t.Fatalf("idle breath moves width only, got %v", got)
+		}
+		if d := math.Abs(float64(got.WidthMult) - 1); d > 0.025+1e-6 {
+			t.Fatalf("idle width amplitude %v exceeds 0.025", d)
+		}
 	}
 }
 
@@ -97,7 +112,7 @@ func TestPeakToPulseLevelMapping(t *testing.T) {
 	cases := []struct {
 		peak int
 		want float32
-	}{{0, 0}, {-100, 0}, {800, 0.5}, {3200, 1}, {32767, 1}}
+	}{{0, 0}, {-100, 0}, {400, 0.5}, {1600, 1}, {32767, 1}}
 	for _, c := range cases {
 		if got := PeakToPulseLevel(c.peak); math.Abs(float64(got-c.want)) > 1e-6 {
 			t.Fatalf("PeakToPulseLevel(%d) = %v, want %v", c.peak, got, c.want)
@@ -121,7 +136,8 @@ func TestGradientAngleIntegratesSmoothly(t *testing.T) {
 		t.Fatalf("angle delta %v want ~%v", b-a, gradientDegPerSec)
 	}
 	frozen := stepGradient(&phase, 1, true)
-	if frozen != 90 {
-		t.Fatalf("reduce motion should freeze angle")
+	frozen2 := stepGradient(&phase, 1, true)
+	if frozen != frozen2 || math.Abs(float64(frozen)-(90+phase)) > 0.01 {
+		t.Fatalf("reduce motion should freeze at the current angle, got %v then %v, phase %v", frozen, frozen2, phase)
 	}
 }

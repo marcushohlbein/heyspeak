@@ -52,13 +52,14 @@ func (v *VoicePulse) Reset() {
 	v.target = 0
 }
 
-// PeakToPulseLevel maps capture peaks to a 0..1 pulse. Lower than the settings
-// meter (peak/8000) so normal speech moves the edge.
+// PeakToPulseLevel maps capture peaks to a 0..1 pulse. Divisor 1600 makes
+// quiet speech fully reactive — deliberately far below the settings meter
+// (peak/8000). The sqrt further lifts low peaks.
 func PeakToPulseLevel(peak int) float32 {
 	if peak <= 0 {
 		return 0
 	}
-	x := float64(peak) / 3200
+	x := float64(peak) / 1600
 	if x > 1 {
 		x = 1
 	}
